@@ -1,7 +1,10 @@
 "use server"
 
+import { canCreateResume } from "@/lib/perimission";
 import prisma from "@/lib/prisma";
+import { getUserSubscriptionLevel } from "@/lib/subscription";
 import { resumeSchema, ResumeValue } from "@/lib/validationForm"
+import { auth } from "@clerk/nextjs/server";
 
 
 const ResumeService = async (values : ResumeValue) => {
@@ -10,9 +13,28 @@ const ResumeService = async (values : ResumeValue) => {
     const {  workExperiences, educations, ...resumeValue } =
     resumeSchema.parse(values);
 
+    const { userId } = await auth();
 
+    if (!userId) {
+
+      throw new Error("User not authenticated");
+    }
+
+
+  const subscriptionLevel = await getUserSubscriptionLevel(userId);
+
+  if (!id) {
+    const resumeCount = await prisma.resume.count({ where: { userId } });
+
+    if (!canCreateResume(subscriptionLevel, resumeCount)) {
+      throw new Error(
+        "Maximum resume count reached for this subscription level",
+      );
+    }
+  }
+  
     const existResume = id ? await prisma.resume.findUnique({
-        where : { id}
+        where : { id,userId}
     }) : null;
 
     if (id && !existResume) {
@@ -47,6 +69,7 @@ const ResumeService = async (values : ResumeValue) => {
         return prisma.resume.create({
           data: {
             ...resumeValue,
+            userId,
             workExperiences: {
               create: workExperiences?.map((exp) => ({
                 ...exp,

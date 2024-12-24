@@ -12,6 +12,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 model Resume {
@@ -39,6 +40,8 @@ model Resume {
 
   createAt  DateTime @default(now())
   updateAt  DateTime @updatedAt
+
+  userId String
   @@map("resumes")
 }
 
@@ -72,4 +75,19 @@ model Education {
   updatedAt DateTime @updatedAt
 
   @@map("educations")
+}
+
+model UserSubscription {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  stripeCustomerId        String   @unique
+  stripeSubscriptionId    String   @unique
+  stripePriceId           String
+  stripeCurrentPeriodEnd  DateTime
+  stripeCancelAtPeriodEnd Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_subscriptions")
 }

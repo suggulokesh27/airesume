@@ -3,10 +3,11 @@
 import { ResumeServerData } from "@/lib/types";
 import { formatDate } from "date-fns";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { Printer, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useReactToPrint } from "react-to-print";
 import { deleteResumeService } from "./deleteResumeService";
 import { useToast } from "@/hooks/use-toast";
 import ResumeTemplete from "../editor/ResumeTemplete";
@@ -17,17 +18,34 @@ interface ResumeItemProps {
 }
 
 export default function ResumeCard({ resume }: ResumeItemProps) {
+    const contentRef = useRef<HTMLDivElement>(null);
+    const reactToPrintFn = useReactToPrint({
+        contentRef,
+        documentTitle: resume.title || "Resume",
+      });
     const wasUpdated = resume.updateAt !== resume.createAt;
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
 
     return (
         <div className="group relative rounded-lg border border-transparent bg-secondary p-3 transition-colors hover:border-border">
+            
+            <div className="mt-3 text-center">
+                <button
+                    className="flex items-center justify-center gap-2"
+                    onClick={() => reactToPrintFn()}
+                >
+                    <Printer size={16} />
+                    Print
+                </button>
+            </div>
             <button
                 className="absolute top-2 right-2 text-red-500 hover:text-red-700 transition-colors"
                 onClick={() => setDeleteModalOpen(true)}
             >
                 <Trash2 size={20} />
             </button>
+
+            {/* Resume content */}
             <div className="space-y-3">
                 <Link href={`/editor?resumeId=${resume.id}`} className="inline-block w-full text-center">
                     <p className="line-clamp-1 font-semibold">{resume.title || "No title"}</p>
@@ -35,11 +53,10 @@ export default function ResumeCard({ resume }: ResumeItemProps) {
                     <p className="text-xs text-muted-foreground">
                         {wasUpdated ? "Updated" : "Created"} on {formatDate(resume.updateAt, "MMM d, yyyy h:mm a")}
                     </p>
-                    <div
-                        className="relative inline-block w-full h-[300px] overflow-auto"
-                    >
+                    <div className="relative inline-block w-full h-[300px] overflow-auto">
                         <ResumeTemplete
                             resumeData={mapToResumeValues(resume)}
+                            contentRef={contentRef}
                         />
                         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
                     </div>
@@ -48,12 +65,12 @@ export default function ResumeCard({ resume }: ResumeItemProps) {
             <DeleteConfirmationDialog
                 open={isDeleteModalOpen}
                 onClose={() => setDeleteModalOpen(false)}
-                // onConfirm={handleDelete}
                 resumeId={resume.id}
             />
         </div>
     );
 }
+
 interface DeleteConfirmationDialogProps {
     resumeId: string;
     open: boolean;
@@ -66,7 +83,6 @@ function DeleteConfirmationDialog({
     onClose,
 }: DeleteConfirmationDialogProps) {
     const { toast } = useToast();
-
     const [isPending, startTransition] = useTransition();
 
     async function handleDelete() {
@@ -90,8 +106,7 @@ function DeleteConfirmationDialog({
                 <DialogHeader>
                     <DialogTitle>Delete resume?</DialogTitle>
                     <DialogDescription>
-                        This will permanently delete this resume. This action cannot be
-                        undone.
+                        This will permanently delete this resume. This action cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>

@@ -1,9 +1,10 @@
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { PlusSquareIcon } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { resumeDataInclude } from "@/lib/types";
 import ResumeCard from "./ResumeCard";
+import { auth } from "@clerk/nextjs/server";
+import CreateResumeButton from "./CreateResumeButton";
+import { getUserSubscriptionLevel } from "@/lib/subscription";
+import { canCreateResume } from "@/lib/perimission";
 
 
 export const metadata = {
@@ -14,30 +15,43 @@ export const metadata = {
 
 const Page = async () => {
 
-    const [resumes] = await Promise.all([
+    const { userId } = await auth();
+    
+    if(!userId){
+        return null;
+    }
+
+    const [resumes, totalCount,subscriptionLevel] = await Promise.all([
         prisma.resume.findMany({
-            orderBy: {
-                updateAt: "desc",
-            },
-            include: resumeDataInclude,
-        })
-    ]);
+          where: {
+            ...(userId ? { userId } : {}),
+          },
+          orderBy: {
+            updateAt: "desc",
+          },
+          include: resumeDataInclude,
+        }),
+        prisma.resume.count({
+          where: {
+            ...(userId ? { userId } : {}), 
+          },
+        }),
+        getUserSubscriptionLevel(userId),
+      ]);
 
     return (
-        <div className="flex flex-col mt-4 gap-10 items-center">
-            <Button asChild className="px-6 py-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-md shadow-md transition-colors duration-200">
-                <Link href="/editor" className=" flex text-sm font-medium">
-                    <PlusSquareIcon />
-                    New Resume
-                </Link>
-            </Button>
-
-            <div className="pl-4 flex w-full grid-cols-2 flex-col gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
-                {resumes.map((resume) => (
-                    <ResumeCard key={resume.id} resume={resume} />
-                ))}
-            </div>
-        </div >
+        <main className="mx-auto w-full max-w-7xl space-y-6 px-3 py-6">
+      <CreateResumeButton canCreate={canCreateResume(subscriptionLevel, totalCount)} />
+      <div className="space-y-1">
+        <h1 className="text-3xl font-bold">Your resumes</h1>
+        <p>Total: {totalCount}</p>
+      </div>
+      <div className="flex w-full grid-cols-2 flex-col gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
+        {resumes.map((resume) => (
+          <ResumeCard key={resume.id} resume={resume} />
+        ))}
+      </div>
+    </main>
     );
 };
 
